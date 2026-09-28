@@ -948,7 +948,7 @@ export class CodexAcpClient {
             input: input,
             approvalPolicy: agentMode.approvalPolicy,
             approvalsReviewer: agentMode.approvalsReviewer,
-            sandboxPolicy: addAdditionalDirectoriesToSandboxPolicy(agentMode.sandboxPolicy, additionalDirectories),
+            sandboxPolicy: createTurnSandboxPolicy(agentMode.sandboxPolicy, additionalDirectories, this.config),
             summary: disableSummary ? "none" : "auto",
             effort: effort,
             model: modelId.model,
@@ -1304,17 +1304,22 @@ function forceGitRootTurnDiffPaths(config: JsonObject): JsonObject {
     };
 }
 
-function addAdditionalDirectoriesToSandboxPolicy(
+function createTurnSandboxPolicy(
     sandboxPolicy: SandboxPolicy,
-    additionalDirectories: string[]
+    additionalDirectories: string[],
+    config: JsonObject,
 ): SandboxPolicy {
-    if (additionalDirectories.length === 0 || sandboxPolicy.type !== "workspaceWrite") {
+    if (sandboxPolicy.type !== "workspaceWrite") {
         return sandboxPolicy;
     }
 
+    const workspaceConfig = config["sandbox_workspace_write"];
+    const networkAccess = isJsonObject(workspaceConfig) ? workspaceConfig["network_access"] : undefined;
     return {
         ...sandboxPolicy,
         writableRoots: uniqueStrings([...sandboxPolicy.writableRoots, ...additionalDirectories]),
+        // Each turn sends an explicit policy, which otherwise masks the session config.
+        networkAccess: typeof networkAccess === "boolean" ? networkAccess : sandboxPolicy.networkAccess,
     };
 }
 
